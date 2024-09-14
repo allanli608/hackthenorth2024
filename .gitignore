@@ -164,3 +164,5 @@ cython_debug/
 .env.local
 
 hackthenorth2024/htn2024-digital-bouncer-e566e0a9a479.json
+
+node_modules/
