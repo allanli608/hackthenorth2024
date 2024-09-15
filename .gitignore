@@ -161,6 +161,8 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
+faceid/raw_data/
+
 .env.local
 
 hackthenorth2024/htn2024-digital-bouncer-e566e0a9a479.json

@@ -1,9 +1,11 @@
 import cv2
 import torch
-from facenet_pytorch import MTCNN, InceptionResnetV1
+from facenet_pytorch import InceptionResnetV1
 import numpy as np
 import time
 from scipy.spatial import distance as dist
+from mtcnn.mtcnn import MTCNN
+
 
 # Initialize MTCNN for face detection and landmark prediction
 mtcnn = MTCNN(keep_all=True, device='cpu', post_process=False)
@@ -43,15 +45,95 @@ def align_face(face, landmarks):
     return aligned_face
 
 
-def compare_faces(registered_embeddings, face_to_compare, threshold=0.7):
+def capture_face_embeddings(cap, num_photos=10, delay=0.2):
+    embeddings = []
+    for _ in range(num_photos):
+        ret, frame = cap.read()
+        if not ret:
+            print("Failed to capture frame")
+            continue
+
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        boxes, probs, landmarks = mtcnn.detect(frame_rgb, landmarks=True)
+
+        if boxes is not None and len(boxes) == 1:
+            box, prob, landmark = boxes[0], probs[0], landmarks[0]
+            if prob > 0.95:
+                detected_face = extract_face(frame_rgb, box, landmark)
+                if detected_face is not None:
+                    with torch.no_grad():
+                        embedding = resnet(detected_face).cpu().numpy()
+                    embeddings.append(embedding)
+
+        time.sleep(delay)  # Wait for the specified delay
+
+    return embeddings
+
+
+def register_face(list_name):
+    cap = cv2.VideoCapture(0)
+    registered_embeddings = []
+    angles = ['center', 'left', 'right']  # List of angles
+    current_angle = 0
+
+    print(f"Registering user for {list_name}. Please look at the camera.")
+    print("Turn your head slightly for each angle as prompted.")
+
+    while current_angle < len(angles):
+        ret, frame = cap.read()
+        if not ret:
+            print("Failed to capture frame")
+            continue
+
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        boxes, probs, landmarks = mtcnn.detect(frame_rgb, landmarks=True)
+
+        frame_with_box = frame.copy()
+
+        if boxes is not None and len(boxes) == 1:
+            box, prob, landmark = boxes[0], probs[0], landmarks[0]
+            if prob > 0.95:
+                cv2.rectangle(frame_with_box, (int(box[0]), int(
+                    box[1])), (int(box[2]), int(box[3])), (0, 255, 0), 2)
+                cv2.putText(frame_with_box, f"Score: {prob:.2f}", (int(box[0]), int(box[1]) - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+
+                print(f"Please face {angles[current_angle]}")
+                embeddings = capture_face_embeddings(cap)
+
+                if embeddings:
+                    # Compute the average embedding for the current angle
+                    avg_embedding = np.mean(embeddings, axis=0)
+                    registered_embeddings.append(avg_embedding)
+                    print(f"{angles[current_angle]
+                             } face captured successfully!")
+                    current_angle += 1  # Move to the next angle after success
+                else:
+                    print("No valid face detected. Please try again.")
+            else:
+                print("Low confidence in face detection. Please try again.")
+        else:
+            print("No face detected. Please try again.")
+
+        cv2.imshow(f'Face Registration - {list_name}', frame_with_box)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+    return registered_embeddings
+
+
+def compare_faces(registered_embeddings, face_to_compare):
     if face_to_compare is None:
-        return 0
+        return []
     with torch.no_grad():
-        emb_to_compare = resnet(face_to_compare).cpu()
+        emb_to_compare = resnet(face_to_compare).cpu().numpy()
     similarities = []
     for reg_emb in registered_embeddings:
-        similarity = torch.nn.functional.cosine_similarity(
-            emb_to_compare, reg_emb).item()
+        similarity = np.dot(emb_to_compare.flatten(), reg_emb.flatten(
+        )) / (np.linalg.norm(emb_to_compare) * np.linalg.norm(reg_emb))
         similarities.append(similarity)
     return similarities
 
@@ -68,95 +150,12 @@ def detect_liveness(landmarks):
 
     # Measure ratio change to detect subtle movements.
     eye_nose_ratio = nose_eye_dist_left / eye_dist
-    print(eye_nose_ratio)
     if eye_nose_ratio > 0.5 and eye_nose_ratio < 1:  # Arbitrary range for head movement
         return True
     return False
 
 
-def register_face():
-    cap = cv2.VideoCapture(0)
-    registered_embeddings = []
-    angles = ['center', 'left', 'right']  # List of angles
-    high_confidence_start_time = None
-    registration_duration = 5  # seconds
-    liveness_detected = False
-    current_angle = 0
-
-    print("Registering user. Please look at the camera.")
-    print("Turn your head slightly for each angle as prompted.")
-
-    while current_angle < len(angles):
-        ret, frame = cap.read()
-        if not ret:
-            print("Failed to capture frame")
-            continue
-
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        boxes, probs, landmarks = mtcnn.detect(frame_rgb, landmarks=True)
-
-        frame_with_box = frame.copy()
-
-        if boxes is not None and len(boxes) > 1:
-            print("Please show only 1 face")
-            high_confidence_start_time = None
-        elif boxes is not None and len(boxes) == 1:
-            box, prob, landmark = boxes[0], probs[0], landmarks[0]
-            if prob > 0.95:
-                cv2.rectangle(frame_with_box, (int(box[0]), int(
-                    box[1])), (int(box[2]), int(box[3])), (0, 255, 0), 2)
-                cv2.putText(frame_with_box, f"Score: {prob:.2f}", (int(box[0]), int(box[1]) - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-
-                # Perform liveness detection (simple head movement)
-                if detect_liveness(landmark):
-                    liveness_detected = True
-                    if high_confidence_start_time is None:
-                        high_confidence_start_time = time.time()
-                    elif time.time() - high_confidence_start_time >= registration_duration:
-                        registered_face = extract_face(
-                            frame_rgb, box, landmark)
-                        if registered_face is not None:
-                            with torch.no_grad():
-                                embedding = resnet(registered_face).cpu()
-                            registered_embeddings.append(embedding)
-                            print(f"{angles[current_angle]
-                                     } face captured successfully!")
-                            current_angle += 1  # Move to the next angle after success
-                            high_confidence_start_time = None
-                        else:
-                            print("Face extraction failed. Please try again.")
-                            high_confidence_start_time = None
-                else:
-                    liveness_detected = False
-                    print("Liveness not detected, please move slightly.")
-            else:
-                high_confidence_start_time = None
-        else:
-            high_confidence_start_time = None
-
-        if high_confidence_start_time is not None:
-            elapsed_time = time.time() - high_confidence_start_time
-            remaining_time = max(0, registration_duration - elapsed_time)
-            cv2.putText(frame_with_box, f"Registering in: {remaining_time:.1f}s", (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
-
-        # Ensure we do not access out of bounds on angles list
-        if current_angle < len(angles):
-            cv2.putText(frame_with_box, f"Please face {angles[current_angle]}", (10, 60),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
-
-        cv2.imshow('Face Registration', frame_with_box)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-
-    cap.release()
-    cv2.destroyAllWindows()
-
-    return registered_embeddings
-
-
-def real_time_verification(registered_embeddings):
+def real_time_verification(whitelist_embeddings, blacklist_embeddings):
     cap = cv2.VideoCapture(0)
 
     print("Real-time verification started. Press 'q' to quit.")
@@ -180,26 +179,30 @@ def real_time_verification(registered_embeddings):
                 if prob > 0.9:  # Only show high-confidence detections
                     detected_face = extract_face(frame_rgb, box, landmark)
                     if detected_face is not None:
-                        similarities = compare_faces(
-                            registered_embeddings, detected_face)
-                        avg_similarity = sum(similarities) / len(similarities)
+                        similarities_whitelist = compare_faces(
+                            whitelist_embeddings, detected_face)
+                        similarities_blacklist = compare_faces(
+                            blacklist_embeddings, detected_face)
+                        avg_similarity_whitelist = np.mean(
+                            similarities_whitelist) if similarities_whitelist else 0
+                        avg_similarity_blacklist = np.mean(
+                            similarities_blacklist) if similarities_blacklist else 0
 
-                        color = (0, 255, 0) if avg_similarity > 0.7 else (
-                            0, 0, 255)
+                        if avg_similarity_whitelist > 0.7:
+                            color = (0, 255, 0)  # Green for whitelist
+                        elif avg_similarity_blacklist > 0.7:
+                            color = (0, 0, 255)  # Red for blacklist
+                        else:
+                            color = (128, 128, 128)  # Grey for neither
+
                         cv2.rectangle(frame_with_box, (int(box[0]), int(
                             box[1])), (int(box[2]), int(box[3])), color, 2)
-                        cv2.putText(frame_with_box, f"Center: {similarities[0]:.2f}", (10, 30),
+                        cv2.putText(frame_with_box, f"Avg: {avg_similarity_whitelist:.2f}", (10, 30),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
-                        cv2.putText(frame_with_box, f"Left: {similarities[1]:.2f}", (10, 60),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
-                        cv2.putText(frame_with_box, f"Right: {similarities[2]:.2f}", (10, 90),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
-                        cv2.putText(frame_with_box, f"Avg: {avg_similarity:.2f}", (10, 120),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
-                        cv2.putText(frame_with_box, "Match" if avg_similarity > 0.7 else "No Match", (10, 150),
+                        cv2.putText(frame_with_box, "Whitelist" if avg_similarity_whitelist > 0.7 else "Blacklist" if avg_similarity_blacklist > 0.7 else "Unknown", (10, 60),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
 
-        cv2.imshow('Real-Time Verification', frame_with_box)
+        cv2.imshow('Real-time Verification', frame_with_box)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
@@ -207,10 +210,34 @@ def real_time_verification(registered_embeddings):
     cv2.destroyAllWindows()
 
 
-# Main execution
-registered_embeddings = register_face()
-if registered_embeddings:
-    print("Face registration complete!")
-    real_time_verification(registered_embeddings)
-else:
-    print("No faces registered. Exiting.")
+def main():
+    while True:
+        command = input(
+            "Enter command (blacklist, whitelist, verification, quit): ").strip().lower()
+
+        if command == 'blacklist':
+            print(
+                "Registering blacklist faces. Please follow the instructions on the screen.")
+            blacklist_embeddings = register_face('blacklist')
+            print("Blacklist registration completed.")
+        elif command == 'whitelist':
+            print(
+                "Registering whitelist faces. Please follow the instructions on the screen.")
+            whitelist_embeddings = register_face('whitelist')
+            print("Whitelist registration completed.")
+        elif command == 'verification':
+            print(
+                "Starting verification. Ensure you have registered faces for whitelist and blacklist.")
+            real_time_verification(whitelist_embeddings, blacklist_embeddings)
+        elif command == 'quit':
+            print("Exiting the application.")
+            break
+        else:
+            print(
+                "Invalid command. Please enter 'blacklist', 'whitelist', 'verification', or 'quit'.")
+
+
+if __name__ == "__main__":
+    whitelist_embeddings = []
+    blacklist_embeddings = []
+    main()
