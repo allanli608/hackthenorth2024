@@ -61,17 +61,9 @@ def close_connection(exception):
 def homepage():
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("SELECT * FROM guests")
+    cursor.execute("SELECT * FROM events")
     # cursor.execute("SELECT * FROM events")
     return jsonify(cursor.fetchall()), 200
-
-
-@app.route('/start-event', methods=['POST'])
-def start_event():
-    print('Starting event')
-    # run CV and all that here
-
-    return jsonify({"message": "Successfully ran event"}), 200
 
 
 @app.route('/create-event', methods=['POST'])
@@ -92,6 +84,25 @@ def create_event():
     db.commit()
 
     return jsonify({'message': 'Event created successfully!'}), 201
+
+
+@app.route('/event/<eventId>', methods=['GET'])
+def get_event(eventId):
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT name, location, date, startTime, endTime FROM events WHERE eventId = (?)", (eventId,))
+    event = cursor.fetchone()
+
+    return jsonify(event), 200
+
+
+@app.route('/event/<eventId>/start', methods=['POST'])
+def start_event():
+    print('Starting event')
+    # run CV and all that here
+
+    return jsonify({"message": "Successfully ran event"}), 200
 
 
 @app.route('/events', methods=['GET'])
