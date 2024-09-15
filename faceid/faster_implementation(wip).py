@@ -2,8 +2,37 @@ import cv2
 import os
 from deepface import DeepFace
 import numpy as np
-import random
 import glob
+import pandas as pd
+import random
+
+import serial
+import time
+import collections
+
+# # Open the serial connection (adjust the port as needed)
+# ser = serial.Serial('COM9', 9600, timeout=1)
+
+# # Allow some time for the connection to establish
+# time.sleep(2)
+
+# print('connected:', ser)
+
+
+# def sendAttackSignal():
+#     # Send a message to the Arduino
+#     ser.write(b'1')
+#     time.sleep(6)
+#     ser.write(b'0')
+
+
+# Parameters
+CONFIDENCE_THRESHOLD = 0.7  # Minimum confidence to trigger servo
+FRAME_WINDOW_SIZE = 30  # Number of frames to consider for rolling confidence
+DECAY_RATE = 0.1  # Rate to decrease confidence when no detection occurs
+
+# Create a deque to track detection confidence
+confidence_window = collections.deque(maxlen=FRAME_WINDOW_SIZE)
 
 
 def extract_frames_from_mp4(mp4_dir, output_dir, num_frames=1):
@@ -64,17 +93,30 @@ def extract_frames_from_mp4(mp4_dir, output_dir, num_frames=1):
         cap.release()
 
 
+def calculate_average_distance(test_img, person_images):
+    distances = []
+    for img_path in person_images:
+        try:
+            result = DeepFace.verify(img1_path=test_img, img2_path=img_path)
+            distances.append(result['distance'])
+        except Exception as e:
+            print(f"Error verifying image {img_path}: {e}")
+            continue
+    if distances:
+        return np.mean(distances)
+    return float('inf')  # Return a high value if no distances were computed
+
+
 def live_verification(db_path, threshold=0.4):
-    # Initialize video capture (webcam)
+    confidence_score = 0
+
     cap = cv2.VideoCapture(0)
 
-    # Setup face database
     while True:
         ret, frame = cap.read()
         if not ret:
             break
 
-        # Convert BGR (OpenCV format) to RGB (DeepFace expected format)
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
         try:
@@ -84,46 +126,59 @@ def live_verification(db_path, threshold=0.4):
                 db_path=db_path,
                 model_name='Facenet512',
                 distance_metric='cosine',
-                enforce_detection=False,  # Set to False to avoid error if no face is detected
-                threshold=threshold,
+                enforce_detection=False,  # Avoid error if no face is detected
                 silent=True
             )
 
+            detected = False  # To check if "caleb" is recognized
             if results and isinstance(results, list) and len(results) > 0:
-                # Get the first dataframe from results
-                result_df = results[0]
-                print(result_df)
-                if not result_df.empty:
-                    # Sort results by distance (lower is better)
-                    best_match = result_df.loc[result_df['distance'].idxmin()]
-                    distance = best_match['distance']
+                for result_df in results:
+                    if not result_df.empty:
+                        for idx, row in result_df.iterrows():
+                            person_name = os.path.basename(
+                                row['identity']).split('_')[0]
+                            distance = row['distance']
+                            x, y, w, h = int(row['source_x']), int(
+                                row['source_y']), int(row['source_w']), int(row['source_h'])
 
-                    if distance < threshold:
-                        name = best_match['identity']
-                        text = f'{name} recognized (Distance: {distance:.2f})'
-                        color = (0, 255, 0)  # Green for recognized
-                    else:
-                        text = "Unknown"
-                        color = (128, 128, 128)  # Grey for unknown
-                else:
-                    text = "Unknown"
-                    color = (128, 128, 128)  # Grey for unknown
-            else:
-                text = "Unknown"
-                color = (128, 128, 128)  # Grey for unknown
+                            if distance < threshold:
+                                label = f"{person_name} (Dist: {distance:.2f})"
+                                color = (0, 255, 0)  # Green for recognized
+                                if person_name == "caleb":
+                                    detected = True
+                                    # Mark this frame as positive detection
+                                    confidence_window.append(1)
+                                else:
+                                    confidence_window.append(0)  # Not Caleb
+
+                                # Draw bounding box and label
+                                cv2.rectangle(
+                                    frame, (x, y), (x + w, y + h), color, 2)
+                                cv2.putText(frame, label, (x, y - 10),
+                                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2, cv2.LINE_AA)
+                            else:
+                                confidence_window.append(0)
+
+            # Decay confidence if no detection
+            if not detected:
+                confidence_score = max(0, confidence_score - DECAY_RATE)
+
+            # Calculate the rolling confidence score
+            if confidence_window:
+                confidence_score = sum(confidence_window) / \
+                    len(confidence_window)
+
+            # Trigger servo if confidence exceeds threshold
+            if confidence_score >= CONFIDENCE_THRESHOLD:
+                print("Caleb detected with high confidence, sending attack signal.")
+                # sendAttackSignal()  # Trigger servo
+                confidence_window.clear()  # Reset after triggering
 
         except Exception as e:
             print(f"Error during face recognition: {e}")
-            text = "Unknown"
-            color = (128, 128, 128)  # Grey for unknown
 
-        # Display results on the frame
-        h, w, _ = frame.shape
-        cv2.putText(frame, text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX,
-                    1, color, 2, cv2.LINE_AA)
         cv2.imshow('Face Recognition', frame)
 
-        # Exit loop on 'q' key press
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
@@ -131,9 +186,7 @@ def live_verification(db_path, threshold=0.4):
     cv2.destroyAllWindows()
 
 
+# extract_frames_from_mp4(
+#     mp4_dir='./sample_mp4s', output_dir='./raw_data', num_frames=15)
 # Example usage
-live_verification(db_path='.\\raw_data', threshold=0.6)
-
-
-# Example usage
-# extract_frames_from_mp4(mp4_dir='.\\sample_mp4s', output_dir='.\\raw_data', num_frames=10)
+live_verification(db_path='.\\raw_data', threshold=0.3)
