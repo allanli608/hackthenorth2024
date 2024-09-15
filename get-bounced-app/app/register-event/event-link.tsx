@@ -1,6 +1,7 @@
 import { Image, StyleSheet, Pressable } from 'react-native';
 import * as Clipboard from 'expo-clipboard'; // Import Clipboard API
 
+import { Link } from 'expo-router';
 import { HelloWave } from '@/components/HelloWave';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
@@ -38,6 +39,11 @@ export default function EventLink() {
         <Pressable style={styles.button} onPress={copyToClipboard}>
           <ThemedText style={styles.text}>Copy Event Code</ThemedText>
         </Pressable>
+        <Pressable style={styles.button}>
+          <Link style={styles.link} href="/">
+            <ThemedText style={styles.buttonText}>Return to Home</ThemedText>
+          </Link>
+        </Pressable>
       </ThemedView>
     </ParallaxScrollView>
   );
@@ -71,4 +77,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  buttonText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  link: {
+    width: '100%'
+  }
 });

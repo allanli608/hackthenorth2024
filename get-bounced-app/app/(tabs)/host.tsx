@@ -33,7 +33,7 @@ export default function HostHomeScreen() {
         />
       }>
       <ThemedText type="title">Create Your Vibe!</ThemedText>
-      <Link href="/register-event/event-email" asChild>
+      <Link href="/register-event/event-link" asChild>
         <Pressable style={styles.button}>
           <ThemedText style={styles.text}>Host an Event</ThemedText>
         </Pressable>
@@ -42,20 +42,28 @@ export default function HostHomeScreen() {
       {myEvents.map((event: any) => {
         return (
           <View key={event[0]} style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-            <ThemedText >{event[3]}</ThemedText>
-            <ThemedText >{event[5]}</ThemedText>
-            <ThemedText >{(new Date(event[4].split('T')[0])).toDateString()}</ThemedText>
-            <Pressable style={styles.smallButton} onPress={async () => {
-              console.log(event[2])
-              const response = await axiosInstance.get(`/event/${event[2]}/guests`)
-              console.log(response.data);
-              const guests = response.data.map((guest: any) => guest[2]);
-              alert('Your guests are:\n' + guests.join(', '));
-            }}
-            ><Text>Guests</Text></Pressable>
-            <Pressable style={{ ...styles.smallButton, backgroundColor: '#faa4a4' }} onPress={() => {
-              copyToClipboard(event[2]);
-            }}><Text>Code</Text></Pressable>
+            <View>
+              <ThemedText type="subtitle">{event[3]}</ThemedText>
+              <ThemedText type="subtitle">{event[5]}</ThemedText>
+              <ThemedText type="subtitle">{new Date(event[4].split('T')[0]).toDateString().split(' ').slice(1, 3).join(' ')}</ThemedText>
+            </View>
+            <View>
+              <Pressable style={styles.smallButton} onPress={async () => {
+                console.log(event[2])
+                const response = await axiosInstance.get(`/event/${event[2]}/guests`)
+                console.log(response.data);
+                const guests = response.data.map((guest: any) => guest[2]);
+                alert('Your guests are:\n' + guests.join(', '));
+              }}
+              ><ThemedText type="subtitle">Guests</ThemedText></Pressable>
+              <Pressable style={{ ...styles.smallButton, backgroundColor: '#c9faa4' }} onPress={() => {
+                copyToClipboard(event[2]);
+              }}><ThemedText type='subtitle'>Code</ThemedText></Pressable>
+              <Pressable style={{ ...styles.smallButton, backgroundColor: '#faa4a4' }} onPress={async () => {
+                const response = await axiosInstance.post(`/start-event`, { event_id: event[2] });
+                console.log(response.data)
+              }}><ThemedText type="subtitle">Start</ThemedText></Pressable>
+            </View>
           </View>
         )
       })}
