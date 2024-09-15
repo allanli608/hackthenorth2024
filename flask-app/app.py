@@ -172,7 +172,7 @@ def create_event():
     email = data.get('email')
     name = data.get('eventName')
     date = data.get('eventDate')
-    location = date.get('eventLocation')
+    location = data.get('eventLocation')
     startTime = data.get('eventStartTime')
     endTime = data.get('eventEndTime')
 
@@ -182,7 +182,36 @@ def create_event():
         "INSERT INTO events (hostEmail, eventId, name, date, location, startTime, endTime) VALUES (?, ?, ?, ?, ?, ?, ?)", (email, eventId, name, date, location, startTime, endTime))
     db.commit()
 
-    return jsonify({'message': 'Event created successfully!'}), 201
+    return jsonify({'message': 'Event created successfully!', 'eventId': eventId}), 201
+
+
+@app.route('/event/<eventId>', methods=['GET'])
+def get_event(eventId):
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT name, location, date, startTime, endTime FROM events WHERE eventId = (?)", (eventId,))
+    event = cursor.fetchone()
+
+    return jsonify(event), 200
+
+
+@app.route('/event/<eventId>/start', methods=['POST'])
+def start_event():
+    print('Starting event')
+    # run CV and all that here
+
+    return jsonify({"message": "Successfully ran event"}), 200
+
+
+@app.route('/event/<eventId>/guests', methods=['GET'])
+def get_guests(eventId):
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT * FROM guests WHERE eventId = (?)", (eventId,))
+    guests = cursor.fetchall()
+
+    return jsonify(guests), 200
 
 
 @app.route('/events', methods=['GET'])
@@ -196,11 +225,12 @@ def get_events():
     return jsonify(events), 200
 
 
-@app.route('/register-guest/<eventId>', methods=['POST'])
-def register_event(eventId):
+@app.route('/register-guest', methods=['POST'])
+def register_event():
     data = json.loads(request.form.get('guestData'))
     name = data.get('guestName')
     email = data.get('guestEmail')
+    eventId = data.get('eventId')
     file = request.files['guestVideo']
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400

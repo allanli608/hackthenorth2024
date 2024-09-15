@@ -69,7 +69,7 @@ export default function RegisterGuestFace() {
     } as any);
 
     try {
-      const response = await axiosInstance.post(`/register-guest/${eventId}`, formData, {
+      const response = await axiosInstance.post(`/register-guest`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         }

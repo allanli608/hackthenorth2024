@@ -5,13 +5,13 @@ import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 
-import { Link, useLocalSearchParams } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import { useFormContext } from './guestContext';
+import axiosInstance from '@/axios';
 
-export default function RegisterGuestName() {
-  const { eventId } = useLocalSearchParams();
+export default function RegisterGuestEvent() {
+  const router = useRouter();
   const { guestData, updateGuestData } = useFormContext();
-  updateGuestData({ eventId: eventId as string });
 
   return (
     <ParallaxScrollView
@@ -27,25 +27,33 @@ export default function RegisterGuestName() {
         <HelloWave />
       </ThemedView>
       <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Name</ThemedText>
+        <ThemedText type="subtitle">Event Code</ThemedText>
+        <ThemedText type="default">Ask your host for the event code!</ThemedText>
         <TextInput
           style={styles.textInput}
-          placeholder="Enter your name"
-          value={guestData.guestName ?? ''}
-          onChangeText={text => updateGuestData({ guestName: text })} // Updates the state when input changes
+          placeholder="word-word-word-word"
+          value={guestData.eventId ?? ''}
+          onChangeText={eventId => updateGuestData({ eventId })} // Updates the state when input changes
         />
       </ThemedView>
-      <Pressable style={styles.button}>
-        <Link style={styles.link} href="/register-guest/guest-email">
-          <ThemedText style={styles.buttonText}>Next</ThemedText>
-        </Link>
+      <Pressable style={styles.button} onPress={async () => {
+        const response = await axiosInstance.get(`/event/${guestData.eventId}`);
+        console.log('test', response.data);
+        if (response.data) {
+          router.push('/register-guest/guest-name');
+        }
+        else {
+          alert('Invalid event code');
+        }
+      }}>
+        <ThemedText style={styles.buttonText}>Next</ThemedText>
       </Pressable>
       <Pressable style={styles.button}>
         <Link style={styles.link} href="/">
           <ThemedText style={styles.buttonText}>Previous</ThemedText>
         </Link>
       </Pressable>
-    </ParallaxScrollView>
+    </ParallaxScrollView >
   );
 }
 
