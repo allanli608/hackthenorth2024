@@ -7,9 +7,15 @@ import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 
-import { Link } from 'expo-router';
+import { useFormContext } from './eventContext';
+import { Link, useRouter } from 'expo-router';
+import axiosInstance from '@/axios';
 
 export default function EventTimes() {
+  const { eventData, updateEventData } = useFormContext();
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+
   const [startTime, setStartTime] = useState(new Date()); // State for start time
   const [endTime, setEndTime] = useState(new Date());     // State for end time
   const [showStartTimePicker, setShowStartTimePicker] = useState(false); // Control visibility of start time picker
@@ -72,9 +78,34 @@ export default function EventTimes() {
         </View>
 
       </ThemedView>
-      <Link href="/register-event/event-link" asChild>
+      <Pressable style={styles.button} onPress={async () => {
+        console.log('clicked')
+        setLoading(true);
+        // Update the event start and end times in the context
+        updateEventData({
+          eventStartTime: startTime.toLocaleTimeString(),
+          eventEndTime: endTime.toLocaleTimeString(),
+        });
+
+        try {
+          const response = await axiosInstance.post('/create-event', {
+            ...eventData, eventStartTime: startTime.toLocaleTimeString(),
+            eventEndTime: endTime.toLocaleTimeString(),
+          });
+          console.log('response data:', response.data)
+          response.data.eventId && updateEventData({ eventId: response.data.eventId });
+          router.push('/register-event/event-link');
+        } catch (error) {
+          alert('Error creating event');
+        }
+        setLoading(false);
+
+      }}>
+        <ThemedText style={styles.text}>{loading ? 'Loading' : 'Next'}</ThemedText>
+      </Pressable>
+      <Link href="/register-event/event-date" asChild>
         <Pressable style={styles.button}>
-          <ThemedText style={styles.text}>Next</ThemedText>
+          <ThemedText style={styles.text}>Previous</ThemedText>
         </Pressable>
       </Link>
     </ParallaxScrollView>

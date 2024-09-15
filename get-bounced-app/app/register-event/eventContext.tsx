@@ -1,33 +1,39 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, ReactNode } from 'react';
 
 type EventData = {
-    eventName: string;
-    eventDate: string;
-    eventLocation: string;
-    eventStartTime: string;
-    eventEndTime: string;
-    // eventId: string;
+    eventName?: string;
+    eventDate?: string;
+    eventLocation?: string;
+    eventStartTime?: string;
+    eventEndTime?: string;
+    eventId?: string;
+    email?: string;
 };
 
-const FormContext = createContext<{ formData: EventData; updateFormData: (newData: Partial<EventData>) => void } | null>(null);
+type EventContextType = {
+    eventData: EventData;
+    updateEventData: (newData: Partial<EventData>) => void;
+};
 
-export const useFormContext = () => useContext(FormContext);
+const FormContext = createContext<EventContextType | undefined>(undefined);
 
-export const FormProvider = ({ children }: { children: React.ReactElement }) => {
-    const [formData, setFormData] = useState({
-        eventName: '',
-        eventDate: '',
-        eventLocation: '',
-        eventStartTime: '',
-        eventEndTime: '',
-    });
+export const useFormContext = (): EventContextType => {
+    const context = useContext(FormContext);
+    if (!context) {
+        throw new Error('useFormContext must be used within a FormProvider');
+    }
+    return context;
+}
 
-    const updateFormData = (newData: Partial<EventData>) => {
-        setFormData((prevData) => ({ ...prevData, ...newData }));
+export const FormProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+    const [eventData, setEventData] = useState<EventData>({});
+
+    const updateEventData = (newData: Partial<EventData>) => {
+        setEventData((prevData) => ({ ...prevData, ...newData }));
     };
 
     return (
-        <FormContext.Provider value={{ formData, updateFormData }}>
+        <FormContext.Provider value={{ eventData, updateEventData }}>
             {children}
         </FormContext.Provider >
     );

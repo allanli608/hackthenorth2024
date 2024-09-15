@@ -5,13 +5,14 @@ import { HelloWave } from '@/components/HelloWave';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { useFormContext } from './eventContext';
 
 export default function EventLink() {
-  const eventUrl = "https://forms.gle/RBhfGhYCC6uYSbVz8"; // Your event URL
+  const { eventData } = useFormContext();
 
   const copyToClipboard = () => {
-    Clipboard.setStringAsync(eventUrl); // Copy URL to clipboard
-    alert("Event link copied to clipboard!");
+    Clipboard.setStringAsync(eventData.eventId ?? ''); // Copy URL to clipboard
+    alert("Event code copied to clipboard!");
   };
 
   return (
@@ -24,15 +25,18 @@ export default function EventLink() {
         />
       }>
       <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Register For an Event</ThemedText>
+        <ThemedText type="title">You're All Set!</ThemedText>
         <HelloWave />
       </ThemedView>
       <ThemedView style={styles.stepContainer}>
+        <ThemedText type="default">
+          Send this code to your guests for them to register:
+        </ThemedText>
         <ThemedText type="subtitle">
-          This is your event link. Send this to your guests for them to register!
+          {eventData.eventId}
         </ThemedText>
         <Pressable style={styles.button} onPress={copyToClipboard}>
-          <ThemedText style={styles.text}>Copy Event Link</ThemedText>
+          <ThemedText style={styles.text}>Copy Event Code</ThemedText>
         </Pressable>
       </ThemedView>
     </ParallaxScrollView>

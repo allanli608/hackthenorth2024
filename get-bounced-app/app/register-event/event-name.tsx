@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { Image, StyleSheet } from 'react-native';
+import { Image, StyleSheet, TextInput, Pressable } from 'react-native';
 
 import { HelloWave } from '@/components/HelloWave';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
@@ -8,11 +7,10 @@ import { ThemedView } from '@/components/ThemedView';
 
 import { Link } from 'expo-router';
 
-// import { useFormContext } from './eventContext';
+import { useFormContext } from './eventContext';
 
 export default function EventName() {
-  // const { updateFormData } = useFormContext()!;
-  const [eventName, setEventName] = useState('');
+  const { eventData, updateEventData } = useFormContext()!;
 
   return (
     <ParallaxScrollView
@@ -23,24 +21,29 @@ export default function EventName() {
           style={styles.reactLogo}
         />
       }>
-      {/* <ThemedView style={styles.titleContainer}>
+      <ThemedView style={styles.titleContainer}>
         <ThemedText type="title">Register For an Event</ThemedText>
         <HelloWave />
-      </ThemedView> */}
-      {/* <ThemedView style={styles.stepContainer}>
+      </ThemedView>
+      <ThemedView style={styles.stepContainer}>
         <ThemedText type="subtitle">Event Name</ThemedText>
         <TextInput
           style={styles.textInput}
           placeholder="Enter event name"
-          value={eventName}
-          onChangeText={(eventName) => updateFormData({ eventName })} // Updates the state when input changes
+          value={eventData.eventName ?? ''}
+          onChangeText={(eventName) => updateEventData({ eventName })} // Updates the state when input changes
         />
       </ThemedView>
-      <Link href="/register-event/event-times" asChild>
+      <Link href="/register-event/event-location" asChild>
         <Pressable style={styles.button}>
           <ThemedText style={styles.text}>Next</ThemedText>
         </Pressable>
-      </Link> */}
+      </Link>
+      <Link href="/register-event/event-email" asChild>
+        <Pressable style={styles.button}>
+          <ThemedText style={styles.text}>Previous</ThemedText>
+        </Pressable>
+      </Link>
     </ParallaxScrollView>
   );
 }

@@ -61,7 +61,7 @@ def close_connection(exception):
 def homepage():
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("SELECT * FROM events")
+    cursor.execute("SELECT * FROM guests")
     # cursor.execute("SELECT * FROM events")
     return jsonify(cursor.fetchall()), 200
 
@@ -73,7 +73,7 @@ def create_event():
     email = data.get('email')
     name = data.get('eventName')
     date = data.get('eventDate')
-    location = date.get('eventLocation')
+    location = data.get('eventLocation')
     startTime = data.get('eventStartTime')
     endTime = data.get('eventEndTime')
 
@@ -83,7 +83,7 @@ def create_event():
         "INSERT INTO events (hostEmail, eventId, name, date, location, startTime, endTime) VALUES (?, ?, ?, ?, ?, ?, ?)", (email, eventId, name, date, location, startTime, endTime))
     db.commit()
 
-    return jsonify({'message': 'Event created successfully!'}), 201
+    return jsonify({'message': 'Event created successfully!', 'eventId': eventId}), 201
 
 
 @app.route('/event/<eventId>', methods=['GET'])
@@ -105,6 +105,16 @@ def start_event():
     return jsonify({"message": "Successfully ran event"}), 200
 
 
+@app.route('/event/<eventId>/guests', methods=['GET'])
+def get_guests(eventId):
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT * FROM guests WHERE eventId = (?)", (eventId,))
+    guests = cursor.fetchall()
+
+    return jsonify(guests), 200
+
+
 @app.route('/events', methods=['GET'])
 def get_events():
     db = get_db()
@@ -116,11 +126,12 @@ def get_events():
     return jsonify(events), 200
 
 
-@app.route('/register-guest/<eventId>', methods=['POST'])
-def register_event(eventId):
+@app.route('/register-guest', methods=['POST'])
+def register_event():
     data = json.loads(request.form.get('guestData'))
     name = data.get('guestName')
     email = data.get('guestEmail')
+    eventId = data.get('eventId')
     file = request.files['guestVideo']
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400

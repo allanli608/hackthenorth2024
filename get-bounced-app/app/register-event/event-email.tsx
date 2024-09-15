@@ -1,4 +1,4 @@
-import { Image, StyleSheet, Pressable, TextInput } from 'react-native';
+import { Image, StyleSheet, TextInput, Pressable } from 'react-native';
 
 import { HelloWave } from '@/components/HelloWave';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
@@ -6,10 +6,11 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 
 import { Link } from 'expo-router';
-import { useFormContext } from './guestContext';
 
-export default function RegisterGuestName() {
-  const { guestData, updateGuestData } = useFormContext();
+import { useFormContext } from './eventContext';
+
+export default function EventEmail() {
+  const { eventData, updateEventData } = useFormContext()!;
 
   return (
     <ParallaxScrollView
@@ -25,27 +26,28 @@ export default function RegisterGuestName() {
         <HelloWave />
       </ThemedView>
       <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Name</ThemedText>
+        <ThemedText type="subtitle">Email</ThemedText>
         <TextInput
           style={styles.textInput}
-          placeholder="Enter your name"
-          value={guestData.guestName ?? ''}
-          onChangeText={text => updateGuestData({ guestName: text })} // Updates the state when input changes
+          placeholder="Enter email"
+          value={eventData.email ?? ''}
+          onChangeText={(email) => updateEventData({ email })} // Updates the state when input changes
         />
       </ThemedView>
-      <Pressable style={styles.button}>
-        <Link style={styles.link} href="/register-guest/guest-email">
-          <ThemedText style={styles.buttonText}>Next</ThemedText>
-        </Link>
-      </Pressable>
-      <Pressable style={styles.button}>
-        <Link style={styles.link} href="/">
-          <ThemedText style={styles.buttonText}>Previous</ThemedText>
-        </Link>
-      </Pressable>
+      <Link href="/register-event/event-name" asChild>
+        <Pressable style={styles.button}>
+          <ThemedText style={styles.text}>Next</ThemedText>
+        </Pressable>
+      </Link>
+      <Link href="/host" asChild>
+        <Pressable style={styles.button}>
+          <ThemedText style={styles.text}>Previous</ThemedText>
+        </Pressable>
+      </Link>
     </ParallaxScrollView>
   );
 }
+
 
 const styles = StyleSheet.create({
   titleContainer: {
@@ -82,13 +84,5 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 16,
     fontWeight: "bold",
-  },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: "bold",
-    textAlign: "center",
-  },
-  link: {
-    width: '100%'
   }
 });
